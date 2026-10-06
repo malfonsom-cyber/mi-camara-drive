@@ -1,107 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Captura de Foto a Drive</title>
-  <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body {
-      margin: 0;
-      padding: 16px;
-      background: #0f172a;
-      color: #f8fafc;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    .container {
-      width: 100%;
-      max-width: 440px;
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    h2 { margin: 0; font-size: 1.25rem; text-align: center; color: #38bdf8; }
-    input[type="file"] { display: none; }
-    .btn {
-      width: 100%;
-      padding: 14px;
-      border-radius: 10px;
-      border: none;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn-camera { background: #0284c7; color: #fff; }
-    .btn-camera:active { background: #0369a1; }
-    .btn-save { background: #16a34a; color: #fff; display: none; }
-    .btn-save:disabled { background: #475569; cursor: not-allowed; }
-    #previewBox {
-      width: 100%;
-      border-radius: 10px;
-      overflow: hidden;
-      display: none;
-      background: #000;
-    }
-    #previewImg { width: 100%; max-height: 340px; object-fit: contain; display: block; }
-    textarea {
-      width: 100%;
-      height: 90px;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: #fff;
-      font-size: 0.95rem;
-      outline: none;
-      resize: none;
-      display: none;
-    }
-    textarea:focus { border-color: #38bdf8; }
-    #status {
-      font-size: 0.9rem;
-      text-align: center;
-      min-height: 24px;
-      font-weight: 500;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="container">
-    <h2>📷 Captura y Subida a Drive</h2>
-
-    <!-- Disparador nativo de cámara trasera -->
-    <input type="file" id="cameraInput" accept="image/*" capture="environment">
-
-    <button id="cameraBtn" class="btn btn-camera" onclick="document.getElementById('cameraInput').click()">
-      Tomar Foto
-    </button>
-
-    <div id="previewBox">
-      <img id="previewImg" alt="Vista previa">
-    </div>
-
-    <textarea id="noteInput" placeholder="Escribe la descripción de la foto..."></textarea>
-
-    <button id="saveBtn" class="btn btn-save" onclick="subirFoto()">
-      Guardar en Drive
-    </button>
-
-    <div id="status"></div>
-  </div>
-
-  <script>
+<script>
     // PEGA AQUÍ TU URL DE LA IMPLEMENTACIÓN WEB
     const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwHV4DC9jqs3XawPL3hbmFr-5NVZDmcq3pts4xpWm_kUHsyu5NziIc238uLO39BVfwI/exec";
 
@@ -119,26 +16,27 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        // Redimensionar antes de subir (para velocidad y ahorro de datos)
-        optimizarImagen(event.target.result, 1280, 0.82, (base64Optimizada) => {
-          imagenBase64 = base64Optimizada;
-          previewImg.src = base64Optimizada;
-          previewBox.style.display = 'block';
-          noteInput.style.display = 'block';
-          saveBtn.style.display = 'flex';
-          cameraBtn.innerText = 'Tomar otra foto';
-          statusDiv.innerText = '';
-          noteInput.focus();
-        });
-      };
-      reader.readAsDataURL(file);
+      // SOLUCIÓN AL ERROR DE MEMORIA: Crea una referencia ligera en vez de leer todo el archivo
+      const imageUrl = URL.createObjectURL(file);
+
+      // Reducimos un poco la resolución máxima a 1024 para aligerar aún más la carga
+      optimizarImagen(imageUrl, 1024, 0.75, (base64Optimizada) => {
+        imagenBase64 = base64Optimizada;
+        previewImg.src = base64Optimizada;
+        previewBox.style.display = 'block';
+        noteInput.style.display = 'block';
+        saveBtn.style.display = 'flex';
+        cameraBtn.innerText = 'Tomar otra foto';
+        statusDiv.innerText = '';
+        noteInput.focus();
+
+        // Liberamos la memoria RAM inmediatamente después de procesar la imagen
+        URL.revokeObjectURL(imageUrl);
+      });
     });
 
-    function optimizarImagen(srcBase64, maxWidth, quality, callback) {
+    function optimizarImagen(imgUrl, maxWidth, quality, callback) {
       const img = new Image();
-      img.src = srcBase64;
       img.onload = () => {
         let width = img.width;
         let height = img.height;
@@ -153,6 +51,7 @@
         ctx.drawImage(img, 0, 0, width, height);
         callback(canvas.toDataURL('image/jpeg', quality));
       };
+      img.src = imgUrl; // Dispara la carga
     }
 
     async function subirFoto() {
@@ -175,7 +74,6 @@
       };
 
       try {
-        // Se envía como text/plain para evitar bloqueos por CORS preflight de Apps Script
         const response = await fetch(URL_APPS_SCRIPT, {
           method: 'POST',
           body: JSON.stringify(payload)
@@ -210,5 +108,3 @@
       }
     }
   </script>
-</body>
-</html>
